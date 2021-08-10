@@ -1,23 +1,36 @@
 #!/bin/sh
 
+mkdir -p assets/image
+mkdir -p assets/metadata
+
 for i in $(seq 0 149)
 do
-	# get Degenimal name from OpenSea API
-	name=$(curl -s "https://api.opensea.io/api/v1/assets?order_direction=desc&collection=degenimals&offset=$i&limit=1"| jq '.assets[].name' | tr -d '"')
+        # download Degenimal asset JSON data
+        json=$( curl -s "https://api.opensea.io/api/v1/assets?order_direction=desc&collection=degenimals&offset=$i&limit=1" | jq '.' )
 
-	echo -n "Processing Degenimal ($name)... "
+        # get Degenimal name
+        name=$( jq '.assets[].name' <<< "$json" | tr -d '"' )
+        echo "Found Degenimal: ${name}!"
 
-	# if assets already exist, skip
-	if test -f ./assets/image/$name
-	then
-		echo "asset exists, skipped"
-	else
-		echo -n "downloading... "
-		wget -q \
-		`curl -s "https://api.opensea.io/api/v1/assets?order_direction=desc&collection=degenimals&offset=$i&limit=1" \
-		| jq '.assets[].image_url' | tr -d '"'` -O assets/image/$name && echo "done"
-	fi
+        # if metadata exists, skip
+        if test -f ./assets/metadata/$name
+        then
+                echo "Metadata exists, skipped..."
+        else
+                echo "$json" > ./assets/metadata/$name.json
+                echo "Metadata saved"
+        fi
 
-	# sleep to avoid hitting API rate limit
-	sleep 1
+        # if asset image already exist, skip
+        if test -f ./assets/image/$name
+        then
+                echo "Avatar image exists, skipped..."
+        else
+                wget `jq '.assets[].image_url' ./assets/metadata/$name | tr -d '"'` -O ./assets/image/$name
+                echo "Avatar image saved"
+        fi
+
+        echo ""
+        # sleep to avoid hitting API rate limit
+        sleep 2
 done
